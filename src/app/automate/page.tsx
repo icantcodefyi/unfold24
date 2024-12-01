@@ -62,6 +62,8 @@ interface AgentData {
   abi?: AbiItem[];
   bytecode?: string;
   function_arguments?: Record<string, string | number | boolean>;
+  attempt?: number;
+  max_attempts?: number;
 }
 
 interface ChatMessage {
@@ -71,7 +73,7 @@ interface ChatMessage {
   type?: "status" | "error" | "message";
   agent?: string;
   action?: string;
-  status?: "in_progress" | "completed" | "failed";
+  status?: "in_progress" | "completed" | "failed" | "error" | "retry";
   data?: AgentData;
 }
 
@@ -85,6 +87,14 @@ interface ProcessStep {
 interface StepProgress {
   id: string;
   progress: number;
+}
+
+interface SSEData {
+  status: "error" | "in_progress" | "completed" | "failed";
+  agent: string;
+  action: string;
+  message?: string;
+  data?: AgentData;
 }
 
 const Navbar = () => {
@@ -176,101 +186,120 @@ export default function EnhancedContentRenderer() {
     setInput("");
     setIsLoading(true);
     setStepProgress([]); // Reset step progress
-    setShouldScroll(true); // Enable scrolling when chat generation starts
+    setShouldScroll(true);
+
+    // Start simulated progress animation
+    const simulateProgress = (stepId: string) => {
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 2; // Random increment between 0-2
+        if (progress > 80) {
+          clearInterval(interval);
+          return;
+        }
+        updateStepProgress(stepId, Math.min(progress, 80));
+      }, 100); // Update every 100ms
+
+      return interval;
+    };
 
     try {
       const response = await fetch("/api/automate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: input }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to generate contract");
-      }
+      if (!response.ok) throw new Error("Failed to generate contract");
 
       const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("No reader available");
-      }
+      if (!reader) throw new Error("No reader available");
 
       const decoder = new TextDecoder();
       let buffer = "";
       let currentMessage: ChatMessage | null = null;
+      const progressIntervals: Record<string, NodeJS.Timeout> = {};
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          // Complete all progress bars to 100% when done
+          Object.entries(progressIntervals).forEach(([stepId, interval]) => {
+            clearInterval(interval);
+            updateStepProgress(stepId, 100);
+          });
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
-
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 
         for (const line of lines) {
           const trimmedLine = line.trim();
-          if (!trimmedLine || trimmedLine === "") continue;
+          if (!trimmedLine?.startsWith("data: ")) continue;
 
-          if (trimmedLine.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(trimmedLine.slice(6)) as {
-                status: "error" | "in_progress" | "completed" | "failed";
-                agent: string;
-                action: string;
-                data: AgentData;
-              };
+          try {
+            const data = JSON.parse(trimmedLine.slice(6)) as SSEData;
+            const stepId = `${data.agent}-${data.action}`;
 
-              // Update progress for the current step
-              if (data.status === "in_progress") {
-                const stepId = `${data.agent}-${data.action}`;
-                const currentProgress =
-                  stepProgress.find((p) => p.id === stepId)?.progress ?? 0;
-                const newProgress = Math.min(
-                  currentProgress + Math.random() * 15 + 5,
-                  99,
-                );
-                updateStepProgress(stepId, newProgress);
-              } else if (
-                data.status === "completed" ||
-                data.status === "failed"
-              ) {
-                const stepId = `${data.agent}-${data.action}`;
+            // Start progress simulation for new steps
+            if (data.status === "in_progress" && !progressIntervals[stepId]) {
+              progressIntervals[stepId] = simulateProgress(stepId);
+            }
+
+            // Complete progress and clear interval when step is done
+            if (data.status === "completed" || data.status === "failed") {
+              if (progressIntervals[stepId]) {
+                clearInterval(progressIntervals[stepId]);
+                delete progressIntervals[stepId];
                 updateStepProgress(stepId, 100);
               }
-
-              if (currentMessage?.agent === data.agent) {
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === currentMessage?.id
-                      ? {
-                          ...msg,
-                          status:
-                            data.status === "error" ? "failed" : data.status,
-                          data: data.data,
-                          action: data.action,
-                        }
-                      : msg,
-                  ),
-                );
-              } else {
-                const newMessage: ChatMessage = {
-                  id: Date.now().toString(),
-                  role: "assistant",
-                  content: "",
-                  type: data.status === "error" ? "error" : "status",
-                  agent: data.agent,
-                  action: data.action,
-                  status: data.status === "error" ? "failed" : data.status,
-                  data: data.data,
-                };
-                setMessages((prev) => [...prev, newMessage]);
-                currentMessage = newMessage;
-              }
-            } catch (e) {
-              console.error("Failed to parse SSE data:", e);
             }
+
+            const newMessage: ChatMessage = {
+              id: Date.now().toString(),
+              role: "assistant",
+              content: data.message ?? "",
+              type: data.status === "error" ? "error" : "status",
+              agent: data.agent,
+              action: data.action,
+              status: data.status,
+              data: {
+                ...data.data,
+                message: data.message,
+                attempt: data.data?.attempt,
+                max_attempts: data.data?.max_attempts,
+              } as AgentData,
+            };
+
+            setMessages((prev) => {
+              const existingMessageIndex = prev.findIndex(
+                (msg) => msg.agent === data.agent && msg.type === "status"
+              );
+
+              if (existingMessageIndex !== -1) {
+                const updatedMessages = [...prev];
+                const existingMessage = updatedMessages[existingMessageIndex];
+                if (existingMessage) {
+                  updatedMessages[existingMessageIndex] = {
+                    ...existingMessage,
+                    status: data.status,
+                    action: data.action,
+                    data: {
+                      ...(existingMessage.data ?? {}),
+                      ...newMessage.data,
+                    },
+                  };
+                  return updatedMessages;
+                }
+              }
+              return [...prev, newMessage];
+            });
+
+            currentMessage = newMessage;
+          } catch (e) {
+            console.error("Failed to parse SSE data:", e);
           }
         }
       }
@@ -279,14 +308,13 @@ export default function EnhancedContentRenderer() {
       const errorMessage: ChatMessage = {
         id: Date.now().toString(),
         role: "assistant",
-        content:
-          "Sorry, there was an error generating the contract. Please try again.",
+        content: "Sorry, there was an error generating the contract. Please try again.",
         type: "error",
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
-      setShouldScroll(false); // Disable scrolling when chat generation ends
+      setShouldScroll(false);
     }
   };
 
@@ -333,20 +361,20 @@ export default function EnhancedContentRenderer() {
         </button>
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            isExpanded ? (hasCode ? "max-h-[80vh]" : "max-h-96") : "max-h-0"
+            isExpanded ? "max-h-[80vh]" : "max-h-0"
           } ${isExpanded ? "opacity-100" : "opacity-0"}`}
         >
-          <div
-            className={`border-t border-gray-800 px-4 py-3 ${hasCode ? "max-h-[80vh] overflow-auto" : ""}`}
-          >
-            <ContentRenderer
-              content={message.content}
-              type={message.type}
-              status={message.status}
-              agent={message.agent}
-              action={message.action}
-              data={message.data}
-            />
+          <div className="border-t border-gray-800 px-4 py-3">
+            <div className="max-h-[60vh] overflow-y-auto">
+              <ContentRenderer
+                content={message.content}
+                type={message.type}
+                status={message.status as "in_progress" | "completed" | "failed" | "retry" | undefined}
+                agent={message.agent}
+                action={message.action}
+                data={message.data}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -382,8 +410,7 @@ export default function EnhancedContentRenderer() {
           <SideLines />
           <TopGradient />
           <BottomGradient />
-
-          <div className="relative z-20 mx-auto flex min-h-[calc(100vh-8rem)] max-w-5xl flex-col px-4 py-10 md:px-8 md:py-20">
+          <div className="relative z-20 mx-auto flex min-h-[calc(100vh-8rem)] max-w-5xl flex-col px-4 py-10 md:px-8">
             <div className="custom-scrollbar flex-1 space-y-6 overflow-y-auto pb-4 pr-4">
               <div className="relative mt-8 space-y-8">
                 {messages.map((message: ChatMessage) => (
@@ -414,7 +441,7 @@ export default function EnhancedContentRenderer() {
                           <ContentRenderer
                             content={message.content}
                             type={message.type}
-                            status={message.status}
+                            status={message.status as "in_progress" | "completed" | "failed" | "retry" | undefined}
                             agent={message.agent}
                             action={message.action}
                             data={message.data}
