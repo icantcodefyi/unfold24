@@ -157,7 +157,7 @@ const AttemptIndicator = ({
     <div className="flex gap-1">
       {Array.from({ length: maxAttempts }).map((_, i) => (
         <div
-          key={i}
+          key={`attempt-${i}`}
           className={`h-2 w-2 rounded-full ${
             i < attempt ? "bg-purple-500" : "bg-purple-800"
           }`}
@@ -313,6 +313,7 @@ const ContentRenderer = React.memo(function ContentRenderer(
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={MarkdownComponents as Components}
+              key={"security-analysis"}
             >
               {props.data.security_analysis ?? props.data.analysis ?? ""}
             </ReactMarkdown>

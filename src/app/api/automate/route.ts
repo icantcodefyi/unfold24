@@ -16,13 +16,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const response = await fetch("http://localhost:8000/generate-contract", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    const response = await fetch(
+      "https://5a62-163-47-210-23.ngrok-free.app/generate-contract",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt: prompt }),
       },
-      body: JSON.stringify({ prompt: prompt }),
-    });
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

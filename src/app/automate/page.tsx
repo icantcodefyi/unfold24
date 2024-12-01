@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   IconLoader2,
   IconSend,
   IconCpu,
   IconUser,
   IconChevronDown,
-  IconCheck,
   IconCircleCheck,
 } from "@tabler/icons-react";
 import dynamic from "next/dynamic";
@@ -198,7 +196,7 @@ export default function EnhancedContentRenderer() {
           return;
         }
         updateStepProgress(stepId, Math.min(progress, 80));
-      }, 100); // Update every 100ms
+      }, 200); // Update every 200ms
 
       return interval;
     };
@@ -275,7 +273,7 @@ export default function EnhancedContentRenderer() {
 
             setMessages((prev) => {
               const existingMessageIndex = prev.findIndex(
-                (msg) => msg.agent === data.agent && msg.type === "status"
+                (msg) => msg.agent === data.agent && msg.type === "status",
               );
 
               if (existingMessageIndex !== -1) {
@@ -308,7 +306,8 @@ export default function EnhancedContentRenderer() {
       const errorMessage: ChatMessage = {
         id: Date.now().toString(),
         role: "assistant",
-        content: "Sorry, there was an error generating the contract. Please try again.",
+        content:
+          "Sorry, there was an error generating the contract. Please try again.",
         type: "error",
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -369,7 +368,14 @@ export default function EnhancedContentRenderer() {
               <ContentRenderer
                 content={message.content}
                 type={message.type}
-                status={message.status as "in_progress" | "completed" | "failed" | "retry" | undefined}
+                status={
+                  message.status as
+                    | "in_progress"
+                    | "completed"
+                    | "failed"
+                    | "retry"
+                    | undefined
+                }
                 agent={message.agent}
                 action={message.action}
                 data={message.data}
@@ -407,6 +413,7 @@ export default function EnhancedContentRenderer() {
         <Navbar />
         <div className="relative my-12 overflow-hidden rounded-3xl bg-gray-50 dark:bg-black">
           <TopLines />
+          <BottomLines />
           <SideLines />
           <TopGradient />
           <BottomGradient />
@@ -441,7 +448,14 @@ export default function EnhancedContentRenderer() {
                           <ContentRenderer
                             content={message.content}
                             type={message.type}
-                            status={message.status as "in_progress" | "completed" | "failed" | "retry" | undefined}
+                            status={
+                              message.status as
+                                | "in_progress"
+                                | "completed"
+                                | "failed"
+                                | "retry"
+                                | undefined
+                            }
                             agent={message.agent}
                             action={message.action}
                             data={message.data}
