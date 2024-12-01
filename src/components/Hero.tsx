@@ -7,7 +7,6 @@ import { ConnectButton } from "thirdweb/react";
 import { client } from "@/components/thirdweb/client";
 
 export function Hero() {
-
   return (
     <div className="relative h-full min-h-[40rem] w-full bg-white dark:bg-black">
       <div className="relative z-20 mx-auto max-w-7xl px-4 py-10 md:px-8 lg:px-4">
@@ -43,7 +42,7 @@ export function Hero() {
                 Deploy Contract
               </Link>
               <Link
-                href="#"
+                href="/automate"
                 className="w-40 gap-1 rounded-full border border-transparent bg-neutral-100 px-4 py-2 text-center text-sm text-black dark:bg-white"
               >
                 View Demo
@@ -56,8 +55,7 @@ export function Hero() {
   );
 }
 
-const Navbar = () => {
-
+export const Navbar = () => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -66,8 +64,10 @@ const Navbar = () => {
 
   return (
     <nav className="flex items-center justify-between">
-      <Logo />
-      <div className="text-sm rounded-xl font-medium text-neutral-700 transition duration-200 hover:opacity-80 dark:text-neutral-200">
+      <Link href="/">
+        <Logo />
+      </Link>
+      <div className="rounded-xl text-sm font-medium text-neutral-700 transition duration-200 hover:opacity-80 dark:text-neutral-200">
         {mounted && (
           <ConnectButton
             client={client}
@@ -80,7 +80,7 @@ const Navbar = () => {
   );
 };
 
-const TopLines = () => {
+export const TopLines = () => {
   return (
     <svg
       width="166"
@@ -204,7 +204,7 @@ const TopLines = () => {
   );
 };
 
-const BottomLines = () => {
+export const BottomLines = () => {
   return (
     <svg
       width="445"
@@ -362,7 +362,7 @@ const BottomLines = () => {
   );
 };
 
-const SideLines = () => {
+export const SideLines = () => {
   return (
     <svg
       width="1382"
@@ -446,7 +446,7 @@ const SideLines = () => {
   );
 };
 
-const Logo = () => {
+export const Logo = () => {
   return (
     <svg
       width="40"
@@ -522,7 +522,7 @@ const Logo = () => {
   );
 };
 
-const BottomGradient = ({ className }: { className?: string }) => {
+export const BottomGradient = ({ className }: { className?: string }) => {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -558,7 +558,7 @@ const BottomGradient = ({ className }: { className?: string }) => {
   );
 };
 
-const TopGradient = ({ className }: { className?: string }) => {
+export const TopGradient = ({ className }: { className?: string }) => {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
