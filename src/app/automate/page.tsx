@@ -25,6 +25,7 @@ import { Logo } from "@/components/Hero";
 import { ConnectButton } from "thirdweb/react";
 import { client } from "@/components/thirdweb/client";
 import Link from "next/link";
+import { avalancheFuji, polygonAmoy, baseSepolia } from "thirdweb/chains";
 
 interface AbiItem {
   type: string;
@@ -137,6 +138,13 @@ export default function EnhancedContentRenderer() {
   );
   const [shouldScroll, setShouldScroll] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [selectedChain, setSelectedChain] = useState(polygonAmoy);
+
+  const chains = [
+    { name: "Polygon Amoy", chain: polygonAmoy },
+    { name: "Avalanche Fuji", chain: avalancheFuji },
+    { name: "Base Sepolia", chain: baseSepolia },
+  ];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -205,7 +213,14 @@ export default function EnhancedContentRenderer() {
       const response = await fetch("/api/automate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: input }),
+        body: JSON.stringify({ 
+          prompt: input,
+          chain: {
+            id: selectedChain.id,
+            name: chains.find(c => c.chain.id === selectedChain.id)?.name,
+            rpc: selectedChain.rpc
+          }
+        }),
       });
 
       if (!response.ok) throw new Error("Failed to generate contract");
