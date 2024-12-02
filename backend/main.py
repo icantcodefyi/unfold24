@@ -1174,6 +1174,7 @@ async def health_check():
 class ContractVerifyRequest(BaseModel):
     contract_address: str
     abi: list
+    chain_id: int
 
 # Add new agent role for contract verification
 class ContractVerificationAgent(ContractAgent):
@@ -1196,37 +1197,56 @@ class ContractVerificationAgent(ContractAgent):
             input_variables=["address", "network", "functions", "events", "input"]
         )
 
+# Add new chain configuration
+SUPPORTED_CHAINS = {
+    'polygon_amoy': {
+        'name': 'Polygon Amoy',
+        'rpc_url': 'https://polygon-amoy.g.alchemy.com/v2/ZPG4ZM3lIzQubp0v9-kGBtiRcLJ2oX2L',
+        'chain_id': 80001,
+        'explorer_url': 'https://www.oklink.com/amoy'
+    },
+}
+
 async def stream_contract_verification(request: ContractVerifyRequest) -> AsyncGenerator[str, None]:
     """Stream the contract verification process using SSE format"""
     try:
+        # Get chain config based on chain_id
+        chain_config = None
+        for chain in SUPPORTED_CHAINS.values():
+            if chain['chain_id'] == request.chain_id:
+                chain_config = chain
+                break
+        
+        if not chain_config:
+            yield "event: error\ndata: " + json.dumps({
+                'agent': 'Verifier',
+                'action': 'Chain validation',
+                'status': 'failed',
+                'data': {'error': f'Unsupported chain ID: {request.chain_id}'}
+            }) + "\n\n"
+            return
+
         # Initialize verification agent
         verifier = ContractVerificationAgent("Verifier", "Smart Contract Verification Specialist")
         
         yield "event: status\ndata: " + json.dumps({
             'agent': 'Verifier',
             'action': 'Connecting to network',
-            'status': 'in_progress'
+            'status': 'in_progress',
+            'data': {'chain': chain_config['name']}
         }) + "\n\n"
 
-        # Connect to network
-        network_url = "https://polygon-amoy.g.alchemy.com/v2/ZPG4ZM3lIzQubp0v9-kGBtiRcLJ2oX2L"
-        w3 = Web3(Web3.HTTPProvider(network_url))
+        # Connect to network using chain-specific RPC
+        w3 = Web3(Web3.HTTPProvider(chain_config['rpc_url']))
         
         if not w3.is_connected():
             yield "event: error\ndata: " + json.dumps({
                 'agent': 'Verifier',
                 'action': 'Network connection',
                 'status': 'failed',
-                'data': {'error': 'Failed to connect to Polygon Amoy network'}
+                'data': {'error': f'Failed to connect to {chain_config["name"]}'}
             }) + "\n\n"
             return
-
-        yield "event: status\ndata: " + json.dumps({
-            'agent': 'Verifier',
-            'action': 'Network connection',
-            'status': 'completed',
-            'data': {'network': 'Polygon Amoy'}
-        }) + "\n\n"
 
         # Create contract instance
         yield "event: status\ndata: " + json.dumps({
@@ -1312,7 +1332,9 @@ async def stream_contract_verification(request: ContractVerifyRequest) -> AsyncG
 
         analysis = verifier.process({
             "address": request.contract_address,
-            "network": "Polygon Amoy",
+            "network": chain_config['name'],
+            "chain_id": request.chain_id,
+            "explorer_url": chain_config['explorer_url'],
             "functions": json.dumps(functions_info, indent=2),
             "events": json.dumps(events_info, indent=2),
             "input": "Analyze this contract's behavior and usage patterns"
@@ -1337,7 +1359,9 @@ async def stream_contract_verification(request: ContractVerifyRequest) -> AsyncG
                     'events': events_info
                 },
                 'blockchain_info': {
-                    'network': 'Polygon Amoy',
+                    'network': chain_config['name'],
+                    'chain_id': chain_config['chain_id'],
+                    'explorer_url': chain_config['explorer_url'],
                     'latest_block': latest_block,
                     'contract_code_exists': bool(w3.eth.get_code(w3.to_checksum_address(request.contract_address)))
                 },
