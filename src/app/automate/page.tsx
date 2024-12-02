@@ -532,10 +532,10 @@ export default function EnhancedContentRenderer() {
                   key={chainInfo.chain.id}
                   onClick={() => handleDeploy(chainInfo.chain)}
                   disabled={isDeploying}
-                  className={`w-full rounded-lg px-4 py-2 flex items-center justify-between ${
+                  className={`w-full rounded-lg p-4 flex items-center justify-between text-white ${
                     isDeploying
-                      ? "bg-gray-800 cursor-not-allowed opacity-50"
-                      : "bg-blue-600 hover:bg-blue-700 transition-colors"
+                      ? "border border-purple-500/30 bg-purple-900/30 cursor-not-allowed opacity-50"
+                      : "border border-purple-500/30 bg-purple-900/30 hover:bg-purple-800/30 transition-colors"
                   }`}
                 >
                   <span>{chainInfo.name}</span>
