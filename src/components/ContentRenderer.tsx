@@ -6,12 +6,10 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
-import { motion, AnimatePresence, type HTMLMotionProps } from "framer-motion";
-import type { SyntaxHighlighterProps } from "react-syntax-highlighter";
-import type { StyleObj } from "react-syntax-highlighter/dist/esm/types";
+import { motion, type HTMLMotionProps } from "framer-motion";
 
 interface CodeProps {
-  node?: any;
+  node?: unknown;
   children?: string;
   className?: string;
   inline?: boolean;
@@ -61,7 +59,7 @@ interface ContentRendererProps {
 
 const MarkdownComponents: Partial<Components> = {
   code: ({ children = "", className, inline, ...props }: CodeProps) => {
-    const match = /language-(\w+)/.exec(className || "");
+    const match = /language-(\w+)/.exec(className ?? "");
     if (inline) {
       return (
         <code
@@ -75,7 +73,7 @@ const MarkdownComponents: Partial<Components> = {
     return (
       <SyntaxHighlighter
         language={match?.[1] ?? "text"}
-        style={oneDark as StyleObj}
+        style={oneDark}
         customStyle={{ background: "transparent", padding: "1rem" }}
         className="rounded border border-gray-800 bg-gray-900/50"
         wrapLongLines
@@ -128,12 +126,12 @@ const MarkdownComponents: Partial<Components> = {
       {children}
     </motion.li>
   ),
-  strong: ({ node, children, ...props }) => (
+  strong: ({ children, ...props }) => (
     <strong className="font-medium text-gray-100" {...props}>
       {children}
     </strong>
   ),
-  a: ({ node, children, href, ...props }) => (
+  a: ({ children, href, ...props }) => (
     <a
       href={href}
       target="_blank"
@@ -251,7 +249,7 @@ const ContentRenderer = React.memo(function ContentRenderer(
                   <button
                     onClick={() =>
                       navigator.clipboard.writeText(
-                        props.data.contract_code ?? "",
+                        props.data?.contract_code ?? "",
                       )
                     }
                     className="rounded bg-purple-800/30 px-2 py-1 text-xs text-purple-300 transition-colors hover:bg-purple-700/30"
