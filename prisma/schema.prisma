@@ -58,8 +58,8 @@ model Contract {
     id              String   @id @default(cuid())
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
-    name            String
-    description     String?
+    // name            String
+    // description     String?
     code            String   @db.Text
     abi             Json?
     bytecode        String   @db.Text
