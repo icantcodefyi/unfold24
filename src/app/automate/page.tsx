@@ -104,6 +104,25 @@ interface SSEData {
   data?: AgentData;
 }
 
+interface ContractDetails {
+  id: string;
+  code: string;
+  abi: any[];
+  bytecode: string;
+  ownerAddress?: string;
+  chainId?: number;
+  constructorArgs?: Record<string, any>;
+}
+
+interface ConstructorInput {
+  type: string;
+  name: string;
+  components?: Array<{
+    type: string;
+    name: string;
+  }>;
+}
+
 const Navbar = () => {
   const [mounted, setMounted] = useState(false);
 
@@ -150,14 +169,19 @@ export default function EnhancedContentRenderer() {
   const [shouldScroll, setShouldScroll] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const account = useActiveAccount();
-  const [contractDetails, setContractDetails] = useState<any>(null);
+  const [contractDetails, setContractDetails] = useState<ContractDetails | null>(null);
+  const [constructorInputs, setConstructorInputs] = useState<Record<string, string>>({});
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployedAddress, setDeployedAddress] = useState<string>("");
   const [error, setError] = useState<string>("");
 
   useEffect(() => {
-    // Fetch contract details when there's a completed message
-    const completedMessage = messages.find(m => m.status === "completed");
+    // Fetch contract details when there's a completed message with contract data
+    const completedMessage = messages.find(m => 
+      m.status === "completed" && 
+      m.data?.contract_code || m.data?.bytecode
+    );
+    
     if (completedMessage && account?.address) {
       fetch(`/api/contract?ownerAddress=${account?.address}`)
         .then(res => res.json())
@@ -170,6 +194,13 @@ export default function EnhancedContentRenderer() {
     }
   }, [messages, account?.address]);
 
+  const handleConstructorInputChange = (name: string, value: string) => {
+    setConstructorInputs(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleDeploy = async (chain: typeof chains[0]["chain"]) => {
     if (!account || !contractDetails) return;
     
@@ -177,6 +208,47 @@ export default function EnhancedContentRenderer() {
     setError("");
 
     try {
+      // Validate required constructor arguments
+      const constructorAbi = contractDetails.abi.find(item => item.type === "constructor");
+      const missingArgs = constructorAbi?.inputs?.filter(
+        (input: ConstructorInput) => !constructorInputs[input.name]
+      );
+
+      if (missingArgs?.length) {
+        throw new Error(`Missing required constructor arguments: ${missingArgs.map((arg: ConstructorInput) => arg.name).join(', ')}`);
+      }
+
+      const args = constructorAbi?.inputs?.reduce((acc: Record<string, any>, input: ConstructorInput) => {
+        const value = constructorInputs[input.name];
+        
+        // Enhanced type conversion based on input type
+        switch(input.type) {
+          case 'uint256':
+          case 'uint8':
+            acc[input.name] = parseInt(value || '0');
+            break;
+          case 'bool':
+            acc[input.name] = Boolean(value);
+            break;
+          case 'string':
+            acc[input.name] = value || '';
+            break;
+          case 'address':
+            acc[input.name] = value || '0x0000000000000000000000000000000000000000';
+            break;
+          default:
+            acc[input.name] = value || '';
+        }
+        return acc;
+      }, {}) || {};
+
+      console.log("Deploying with args:", args);
+      console.log("Bytecode:", `0x${contractDetails.bytecode}`);
+      console.log("Constructor Params:", args);
+      console.log("Chain:", chain);
+      console.log("Account:", account?.address);
+      console.log("ABI:", contractDetails.abi);
+
       const contractAddress = await deployContract({
         client,
         account,
@@ -185,7 +257,8 @@ export default function EnhancedContentRenderer() {
           id: chain.id,
         },
         abi: contractDetails.abi,
-        bytecode: contractDetails.bytecode,
+        bytecode: `0x${contractDetails.bytecode}`,
+        constructorParams: args,
       });
 
       setDeployedAddress(contractAddress);
@@ -447,20 +520,22 @@ export default function EnhancedContentRenderer() {
         </div>
         
         {/* Add deployment section when contract is ready */}
-        {isExpanded && contractDetails && message.status === "completed" && (
+        {isExpanded && message.data?.bytecode && message.status === "completed" && (
           <div className="border-t border-gray-800 px-4 py-3">
             <h3 className="mb-4 text-lg font-medium text-gray-200">Deploy Contract</h3>
             
+            {renderConstructorInputs()}
+
             <div className="space-y-4">
               {chains.map((chainInfo) => (
                 <button
                   key={chainInfo.chain.id}
                   onClick={() => handleDeploy(chainInfo.chain)}
                   disabled={isDeploying}
-                  className={`w-full px-4 py-2 rounded-lg flex items-center justify-between ${
+                  className={`w-full rounded-lg px-4 py-2 flex items-center justify-between ${
                     isDeploying
-                      ? "bg-gray-800 cursor-not-allowed"
-                      : "bg-gray-800 hover:bg-gray-700"
+                      ? "bg-gray-800 cursor-not-allowed opacity-50"
+                      : "bg-blue-600 hover:bg-blue-700 transition-colors"
                   }`}
                 >
                   <span>{chainInfo.name}</span>
@@ -486,6 +561,43 @@ export default function EnhancedContentRenderer() {
             )}
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderConstructorInputs = () => {
+    if (!contractDetails?.abi) return null;
+
+    const constructorAbi = contractDetails.abi.find(item => item.type === "constructor");
+    if (!constructorAbi?.inputs?.length) return null;
+
+    return (
+      <div className="mb-4 space-y-4">
+        <h4 className="text-md font-semibold text-gray-200">Constructor Arguments</h4>
+        {constructorAbi.inputs.map((input: ConstructorInput, index: number) => {
+          // Find example value from contract details
+          const exampleValue = contractDetails.constructorArgs?.[input.name]?.example_value;
+          
+          return (
+            <div key={index} className="space-y-2">
+              <label className="block text-sm text-gray-300">
+                {input.name} ({input.type})
+                {exampleValue && (
+                  <span className="ml-2 text-xs text-gray-500">
+                    Example: {exampleValue}
+                  </span>
+                )}
+              </label>
+              <input
+                type="text"
+                value={constructorInputs[input.name] || ''}
+                onChange={(e) => handleConstructorInputChange(input.name, e.target.value)}
+                placeholder={exampleValue ? `e.g. ${exampleValue}` : `Enter ${input.type}`}
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 p-2 text-gray-200 placeholder-gray-500"
+              />
+            </div>
+          );
+        })}
       </div>
     );
   };
