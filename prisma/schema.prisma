@@ -43,7 +43,6 @@ model User {
     image         String?
     accounts      Account[]
     sessions      Session[]
-    contracts     Contract[]
 }
 
 model VerificationToken {
@@ -58,15 +57,10 @@ model Contract {
     id              String   @id @default(cuid())
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
-    // name            String
-    // description     String?
     code            String   @db.Text
     abi             Json?
     bytecode        String   @db.Text
-    address         String?
-    userId          String
-    user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    deployed        Boolean  @default(false)
+    ownerAddress    String?
     chainId         Int?
     constructorArgs Json?
 }

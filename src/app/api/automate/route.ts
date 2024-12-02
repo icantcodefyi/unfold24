@@ -1,13 +1,15 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { NextResponse } from "next/server";
+import { db } from "../../../server/db";
 
 interface ContractPrompt {
   prompt: string;
+  ownerAddress: string;
 }
 
 export async function POST(request: Request) {
   try {
-    const { prompt }: ContractPrompt = await request.json();
+    const { prompt, ownerAddress }: ContractPrompt = await request.json();
     let contractAbi: string | null = null;
     let contractBytecode: string | null = null;
     let contractCode: string | null = null;
@@ -20,14 +22,21 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!ownerAddress) {
+      return NextResponse.json(
+        { error: "Owner address is required" },
+        { status: 400 },
+      );
+    }
+
     const response = await fetch(
-      "https://5a62-163-47-210-23.ngrok-free.app/generate-contract",
+      "https://7311-36-255-87-26.ngrok-free.app/generate-contract",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt: prompt }),
+        body: JSON.stringify({ prompt: prompt, ownerAddress: ownerAddress }),
       },
     );
 
@@ -79,6 +88,15 @@ export async function POST(request: Request) {
 
               if (contractAbi && contractBytecode && contractCode && contractArgs) {
                 console.log("Contract data collection is complete");
+                await db.contract.create({
+                  data: {
+                    abi: contractAbi,
+                    bytecode: contractBytecode,
+                    code: contractCode,
+                    constructorArgs: contractArgs,
+                    ownerAddress: ownerAddress,
+                  },
+                });
               }
 
               // Forward the complete line to the client

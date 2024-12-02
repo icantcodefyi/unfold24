@@ -26,6 +26,8 @@ import { ConnectButton } from "thirdweb/react";
 import { client } from "@/components/thirdweb/client";
 import Link from "next/link";
 import { avalancheFuji, polygonAmoy, baseSepolia } from "thirdweb/chains";
+import { deployContract } from "thirdweb/deploys";
+import { useActiveAccount } from "thirdweb/react";
 
 const chains = [
   { name: "Polygon Amoy", chain: polygonAmoy },
@@ -147,6 +149,53 @@ export default function EnhancedContentRenderer() {
   );
   const [shouldScroll, setShouldScroll] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const account = useActiveAccount();
+  const [contractDetails, setContractDetails] = useState<any>(null);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deployedAddress, setDeployedAddress] = useState<string>("");
+  const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    // Fetch contract details when there's a completed message
+    const completedMessage = messages.find(m => m.status === "completed");
+    if (completedMessage && account?.address) {
+      fetch(`/api/contract?ownerAddress=${account?.address}`)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.error) {
+            setContractDetails(data);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [messages, account?.address]);
+
+  const handleDeploy = async (chain: typeof chains[0]["chain"]) => {
+    if (!account || !contractDetails) return;
+    
+    setIsDeploying(true);
+    setError("");
+
+    try {
+      const contractAddress = await deployContract({
+        client,
+        account,
+        chain: {
+          rpc: chain.rpc,
+          id: chain.id,
+        },
+        abi: contractDetails.abi,
+        bytecode: contractDetails.bytecode,
+      });
+
+      setDeployedAddress(contractAddress);
+    } catch (err) {
+      console.error("Deploy error:", err);
+      setError(err instanceof Error ? err.message : "Failed to deploy contract");
+    } finally {
+      setIsDeploying(false);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -216,7 +265,8 @@ export default function EnhancedContentRenderer() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          prompt: input
+          prompt: input,
+          ownerAddress: account?.address,
         }),
       });
 
@@ -395,6 +445,47 @@ export default function EnhancedContentRenderer() {
             </div>
           </div>
         </div>
+        
+        {/* Add deployment section when contract is ready */}
+        {isExpanded && contractDetails && message.status === "completed" && (
+          <div className="border-t border-gray-800 px-4 py-3">
+            <h3 className="mb-4 text-lg font-medium text-gray-200">Deploy Contract</h3>
+            
+            <div className="space-y-4">
+              {chains.map((chainInfo) => (
+                <button
+                  key={chainInfo.chain.id}
+                  onClick={() => handleDeploy(chainInfo.chain)}
+                  disabled={isDeploying}
+                  className={`w-full px-4 py-2 rounded-lg flex items-center justify-between ${
+                    isDeploying
+                      ? "bg-gray-800 cursor-not-allowed"
+                      : "bg-gray-800 hover:bg-gray-700"
+                  }`}
+                >
+                  <span>{chainInfo.name}</span>
+                  {isDeploying && <IconLoader2 className="animate-spin" />}
+                </button>
+              ))}
+            </div>
+
+            {error && (
+              <div className="mt-4 p-4 bg-red-900/50 border border-red-500 rounded-lg text-red-200">
+                {error}
+              </div>
+            )}
+
+            {deployedAddress && (
+              <div className="mt-4 p-4 bg-green-900/20 border border-green-500 rounded-lg">
+                <h4 className="text-md font-semibold mb-2">Contract Deployed!</h4>
+                <p className="text-gray-300 mb-2">Contract Address:</p>
+                <code className="block p-3 bg-black/50 rounded border border-gray-700 break-all">
+                  {deployedAddress}
+                </code>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
