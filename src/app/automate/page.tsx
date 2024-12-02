@@ -552,9 +552,9 @@ export default function EnhancedContentRenderer() {
 
             {deployedAddress && (
               <div className="mt-4 p-4 bg-green-900/20 border border-green-500 rounded-lg">
-                <h4 className="text-md font-semibold mb-2">Contract Deployed!</h4>
+                <h4 className="text-md font-semibold mb-2 text-white">Contract Deployed!</h4>
                 <p className="text-gray-300 mb-2">Contract Address:</p>
-                <code className="block p-3 bg-black/50 rounded border border-gray-700 break-all">
+                <code className="block p-3 bg-black/50 rounded border border-gray-700 break-all text-white">
                   {deployedAddress}
                 </code>
               </div>
