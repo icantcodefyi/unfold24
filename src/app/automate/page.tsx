@@ -27,6 +27,12 @@ import { client } from "@/components/thirdweb/client";
 import Link from "next/link";
 import { avalancheFuji, polygonAmoy, baseSepolia } from "thirdweb/chains";
 
+const chains = [
+  { name: "Polygon Amoy", chain: polygonAmoy },
+  { name: "Avalanche Fuji", chain: avalancheFuji },
+  { name: "Base Sepolia", chain: baseSepolia },
+];
+
 interface AbiItem {
   type: string;
   name?: string;
@@ -112,8 +118,11 @@ const Navbar = () => {
         {mounted && (
           <ConnectButton
             client={client}
+            chains={chains.map(c => c.chain)}
             connectButton={{ label: "Sign In" }}
-            connectModal={{ size: "wide" }}
+            connectModal={{ 
+              size: "wide",
+            }}
           />
         )}
       </div>
@@ -138,13 +147,6 @@ export default function EnhancedContentRenderer() {
   );
   const [shouldScroll, setShouldScroll] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [selectedChain, setSelectedChain] = useState(polygonAmoy);
-
-  const chains = [
-    { name: "Polygon Amoy", chain: polygonAmoy },
-    { name: "Avalanche Fuji", chain: avalancheFuji },
-    { name: "Base Sepolia", chain: baseSepolia },
-  ];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -214,12 +216,7 @@ export default function EnhancedContentRenderer() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          prompt: input,
-          chain: {
-            id: selectedChain.id,
-            name: chains.find(c => c.chain.id === selectedChain.id)?.name,
-            rpc: selectedChain.rpc
-          }
+          prompt: input
         }),
       });
 
